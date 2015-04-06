@@ -4,7 +4,7 @@
 #include "constants.h"
 #include "lcd.h"
 #include <Arduino.h>
-#include <PFFS.h>
+#include <SdFat.h>
 
 void note_kill(note *n) {
   n->pitch = 0;
@@ -37,7 +37,7 @@ unsigned int get_on_time(long freq) {
 
 unsigned int read_msg(unsigned char *track, unsigned int index, timedMidiMsg* msg) {
   if (index >= sd->read_count) {
-    pf_read(sd->buf, FILE_BUFFER_SIZE, &(sd->read_count));
+    ////pf_read(sd->buf, FILE_BUFFER_SIZE, &(sd->read_count));
     if (sd->read_count == 0) return 0;
     index = 0;
   }
@@ -79,24 +79,12 @@ void decvol(LiquidCrystal *lcd) {
   volindex--;
 }
 
-unsigned char chk_ext(char* fname) {
-  int i;
-  for (i = 0;;i++) {
-    if (fname[i] == '\0') return 0;
-    if (fname[i] == '.') break;
-  }
-  if (fname[i+1] != 'O') return 0;
-  if (fname[i+2] != 'M') return 0;
-  if (fname[i+3] != 'D') return 0;
-  return 1;
-}
-
 void print_hex_buf(LiquidCrystal *lcd, unsigned char* buf, unsigned char count) {
   for (char i = 0; i < count; i++) {
     char h = (buf[i] & 0xf0) >> 4;
     char l = buf[i] & 0x0f;
-    char ht = hex[h];
-    char lt = hex[l];
+    char ht = chex[h];
+    char lt = chex[l];
     lcd->print(ht);
     lcd->print(lt);
     lcd->print(' ');
@@ -106,8 +94,8 @@ void print_hex_buf(LiquidCrystal *lcd, unsigned char* buf, unsigned char count) 
 void print_byte(LiquidCrystal *lcd, unsigned char x) {
   char h = (x & 0xf0) >> 4;
   char l = x & 0x0f;
-  char ht = hex[h];
-  char lt = hex[l];
+  char ht = chex[h];
+  char lt = chex[l];
   lcd->print(ht);
   lcd->print(lt);
   lcd->print(' ');

@@ -1,7 +1,7 @@
 #ifndef __DATATYPES_H
 #define __DATATYPES_H
 
-#include <PFFS.h>
+#include <SdFat.h>
 
 typedef struct {
   unsigned char pitch;
@@ -32,12 +32,13 @@ typedef struct {
 } serialsource;
 
 typedef struct {
-  FATFS* fs;
-  DIR* dir;
-  WORD read_count;
+  unsigned char read_count;
   timedMidiMsg *next;
   midiMsg *p_msg;
-  
+
+  char last_error[17];  
+  unsigned char valid;
+  unsigned int file_count;
   unsigned char *buf;
   unsigned char *msgbuf;
   unsigned int buf_index;

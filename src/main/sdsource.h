@@ -2,7 +2,10 @@
 #define __SD_SOURCE
 
 void sdsource_init();
-unsigned char sdsource_load(char* fname);
 void sdsource_run();
+void sdsource_initcard();
+unsigned char sdsource_filenext();
+void sdsource_playfile();
+unsigned char check_and_get_filename();
 
 #endif

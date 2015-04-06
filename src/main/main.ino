@@ -16,8 +16,7 @@
 #include "lcd.h"
 
 #include <LiquidCrystal.h>
-#include <PFFS.h>
-#include <SPI.h>
+#include <SdFat.h>
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
@@ -25,55 +24,49 @@ note *note1, *note2;
 midiMsg *last_message;
 serialsource *serial;
 sdsource *sd;
-FILINFO f;
 char volindex, menuindex = 0;
 int ffreq = 20;
 
 void fixedLoop();
+void displayMenu();
 
 void setup() {
- setupTimers();
- setupPins();
- player_init();
- sdsource_init();
- serialsource_init();
- lcd_init();
- unsigned char err = pf_readdir(sd->dir, &f);
- pf_readdir(sd->dir, (FILINFO*) (0));
- if (err) {
-   lcd_printhome("No card found");
- } else {
-   lcd_printhome("Fixed Mode");
-   unsigned char n = 20;
- }
+  lcd_init();
+  lcd_printhome("Booting...");
+  setupTimers();
+  setupPins();
+  player_init();
+  sdsource_init();
+  serialsource_init();
+  displayMenu();
 }
 
 void loop() {
   unsigned char key = get_key();
   if (key == btnDOWN) {
-    if (menuindex == 0) {
-      lcd_printhome("Live Mode");
-      menuindex++;
+    if (menuindex == 3) {
+      menuindex = 0;
     } else {
-      menuindex = 2;
-      pf_readdir(sd->dir, &f);
-      if (f.fname[0] == (char) (0)) {
-        pf_readdir(sd->dir, (FILINFO*) (0));
-        lcd_printhome("Fixed Mode");
-        menuindex = 0;
-      } else {
-        lcd_printhome(f.fname);
-        lcd_printat(0, 1, f.fsize);
-      }
+      menuindex++;
     }
+    displayMenu();
+    delay(180);
+  }
+  if (key == btnUP) {
+    if (menuindex == 0) {
+      menuindex = 3;
+    } else {
+      menuindex--;
+    }
+    displayMenu();
     delay(180);
   }
   if (key == btnSELECT) {
-    if (menuindex == 0) {
+    if (menuindex == MENU_FIXED) {
       delay(150);
       fixedLoop();
       delay(300);
-    } else if (menuindex == 1) {
+    } else if (menuindex == MENU_LIVE) {
       delay(150);
       lcd_printhome("Live Mode ON");
       lcd_setcursor(0, 1);
@@ -83,21 +76,33 @@ void loop() {
       serialsource_run();
       lcd_printhome("Live Mode");
       delay(300);
-    } else if (!chk_ext(f.fname)) {
-      lcd_printhome("Invalid file");
-    } else {
-      sdsource_load(f.fname);
-      lcd_printhome("\2 ");
-      lcd_setcursor(0, 1);
-      for (int i = 0; i < volindex; i++) {
-        lcd_print((char) (1));
+    } else { // MENU_SDCARD
+      delay(150);
+      if (sd->valid) {
+        sdsource_run();
+      } else {
+        sdsource_initcard();
       }
       delay(300);
-      sdsource_run();
-      lcd_printhome(f.fname);
-      lcd_printat(0, 1, f.fsize);
-      delay(300);
     }
+  }
+}
+
+void displayMenu()
+{
+  if (menuindex == 0) {
+    lcd_printhome("SD Card");
+    lcd_setcursor(0, 1);
+    if (sd->valid) {          
+      lcd_print(sd->file_count);
+      lcd_print(" file(s).");
+    } else {
+      lcd_print((char *)sd->last_error);
+    }
+  } else if (menuindex == 1) {
+    lcd_printhome("Live Mode");
+  } else {
+    lcd_printhome("Fixed Mode");
   }
 }
 

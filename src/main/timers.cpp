@@ -4,7 +4,7 @@
 #include "system.h"
 #include "datatypes.h"
 #include "lcd.h"
-
+ 
 void startTimer1() {
   long ticks = CPU_CLK * note1->period / 8;
   
