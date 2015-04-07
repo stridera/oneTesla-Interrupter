@@ -44,7 +44,7 @@ void setup() {
 void loop() {
   unsigned char key = get_key();
   if (key == btnDOWN) {
-    if (menuindex == 3) {
+    if (menuindex == 2) {
       menuindex = 0;
     } else {
       menuindex++;

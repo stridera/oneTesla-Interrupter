@@ -32,7 +32,7 @@ typedef struct {
 } serialsource;
 
 typedef struct {
-  unsigned char read_count;
+  int read_count;
   timedMidiMsg *next;
   midiMsg *p_msg;
 

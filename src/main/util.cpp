@@ -35,19 +35,6 @@ unsigned int get_on_time(long freq) {
   else {return LOOKUP_TABLE_SCALE * on_times[index];}
 }
 
-unsigned int read_msg(unsigned char *track, unsigned int index, timedMidiMsg* msg) {
-  if (index >= sd->read_count) {
-    ////pf_read(sd->buf, FILE_BUFFER_SIZE, &(sd->read_count));
-    if (sd->read_count == 0) return 0;
-    index = 0;
-  }
-  msg->time = ((((unsigned int) track[index]) << 7) + (track[index + 1] & 0x7f));
-  msg->cmd = ((track[index + 1] & 0x80) >> 7) ? 0x91 : 0x81;
-  msg->db1 = track[index + 2];
-  msg->db2 = track[index + 3];
-  return index + 4;
-}
-
 unsigned char get_key()
 {
 #ifndef DEBUG

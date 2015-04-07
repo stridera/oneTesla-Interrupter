@@ -9,8 +9,6 @@ void make_note(note *n, unsigned char pitch, unsigned char velocity);
 //frequency utilities
 unsigned int get_on_time(long freq);
 unsigned long get_freq(unsigned char note);
-//midi utils
-unsigned int read_msg(unsigned char *track, unsigned int index, timedMidiMsg* msg);
 //keypresses
 unsigned char get_key();
 //volume bar

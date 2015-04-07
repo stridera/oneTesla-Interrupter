@@ -14,7 +14,7 @@ char filename[256];
 
 void sdsource_init() {
   sd = (sdsource*) malloc(sizeof(sdsource));
-  sd->buf = (unsigned char*) calloc(FILE_BUFFER_SIZE * sizeof(unsigned char), sizeof(unsigned char));
+  sd->buf = (unsigned char*) calloc(FILE_BUFFER_SIZE * sizeof(char), sizeof(char));
   sd->next = (timedMidiMsg*) malloc(sizeof(timedMidiMsg));
   sd->p_msg = (midiMsg*) malloc(sizeof(midiMsg));
   sd->last_error[0] = '\0';
@@ -47,7 +47,7 @@ void sdsource_initcard() {
 
   lcd_printhome("Loading...");
 
-  while(sdsource_filenext()) {  
+  while(sdsource_filenext(false)) {  
     sd->file_count++;
   }
   file.close();
@@ -60,30 +60,37 @@ void sdsource_initcard() {
   sd->valid = 1;
 }
 
-unsigned char sdsource_filenext() {
+unsigned char sdsource_filenext(bool loadfile = false) {
   if (file.isOpen()) {
     file.close();
   }
   while (file.openNext(fs.vwd(), O_READ)) {
     file.getName(filename, sizeof(filename));
     if (check_and_get_filename()) {
-      return 1;
+        if (loadfile) sdsource_loadfile();
+        return 1;
     }
     file.close();
   }
   return 0;
 }
 
-unsigned char sdsource_fileprev() {
+unsigned char sdsource_fileprev(bool loadfile = false) {
+  fs.vwd()->rewind();
+  return sdsource_filenext(true);
   // dir size is 32.
-  uint16_t index = file.curPosition()/32;
+  uint16_t index = fs.vwd()->curPosition()/32;
   if (index < 2) return false;
   // position to possible previous file location.
   index -= 2;
   do {
-    if (file.open(&file, index, O_READ)) {
+    if (file.open(fs.vwd(), index, O_READ)) {
       file.getName(filename, sizeof(filename));
+      lcd_printhome("Chk: ");
+      lcd_print(filename); delay(1000);
       if (check_and_get_filename()) {
+        lcd_printhome("Failed"); delay(1000);
+        if (loadfile) sdsource_loadfile();
         return 1;
       }
       file.close();
@@ -99,8 +106,7 @@ unsigned char check_and_get_filename() {
   return 1;
 }
 
-void sdsource_showfilename(int pos = 0)
-{
+void sdsource_showfilename(int pos = 0) {
   int fn_len = strlen(filename) - 16;
   int start = 0;
   if (fn_len < 0)
@@ -116,16 +122,29 @@ void sdsource_showfilename(int pos = 0)
   
   lcd_printhome(&filename[start]);
   lcd_setcursor(0, 1);
-  lcd_print("Size: ");
-  lcd_print(file.fileSize());
-  lcd_print("b");
+  
+  unsigned int lsec = (int) (sd->len / 1000);
+  lcd_print(lsec / 60);
+  lcd_print(':');
+  unsigned int tmp = lsec % 60;
+  if (tmp < 10) lcd_print('0');
+  lcd_print(tmp);
+}
+
+void sdsource_loadfile() {
+  memset(sd->buf, 0, FILE_BUFFER_SIZE);
+  sd->read_count = file.read(sd->buf, FILE_BUFFER_SIZE);
+  sd->len = ((long) sd->buf[0] << 24) + ((long) sd->buf[1] << 16) + ((long) sd->buf[2] << 8) + (long) sd->buf[3];
+  sd->buf_index = 4;
+  sd->time = 0;
+  sd->buf_index = read_msg(sd->buf, sd->buf_index, sd->next);
 }
 
 void sdsource_run() {
   unsigned long kt = millis();
   int filepos = 0;
   
-  sdsource_filenext();
+  sdsource_filenext(true);
   sdsource_showfilename(0);
   
   for (;;) {
@@ -137,12 +156,18 @@ void sdsource_run() {
       kt = t;
     }      
     
+    if (key == btnSELECT) {
+      delay(150);
+      sdsource_playfile();
+      delay(300);
+    }
+    
     if (key == btnDOWN) {
       delay(150);
-      if (!sdsource_filenext()) {
+      if (!sdsource_filenext(true)) {
         file.close();
         fs.vwd()->rewind();
-        sdsource_filenext();
+        sdsource_filenext(true);
       }
       filepos = 0; kt = t;
       delay(300);
@@ -150,25 +175,32 @@ void sdsource_run() {
     
     if (key == btnUP) {
       delay(150);
-      sdsource_fileprev();
+      sdsource_fileprev(true);
       filepos = 0; kt = t;
       delay(300);
     }
   }
 }
 
-unsigned char sdsource_load(char* fname) {
-  unsigned char err = 0;//pf_open(fname);
-  memset(sd->buf, 0, FILE_BUFFER_SIZE);
- // pf_read(sd->buf, FILE_BUFFER_SIZE, &(sd->read_count));
-  sd->len = ((long) sd->buf[0] << 24) + ((long) sd->buf[1] << 16) + ((long) sd->buf[2] << 8) + (long) sd->buf[3];
-  sd->buf_index = 4;
-  sd->time = 0;
-  sd->buf_index = read_msg(sd->buf, sd->buf_index, sd->next);
-  return err;
+unsigned int read_msg(unsigned char *track, unsigned int index, timedMidiMsg* msg) {
+  if (index >= sd->read_count) {
+    sd->read_count = file.read(sd->buf, FILE_BUFFER_SIZE);
+    if (sd->read_count == 0) return 0;
+    index = 0;
+  }
+  msg->time = ((((unsigned int) track[index]) << 7) + (track[index + 1] & 0x7f));
+  msg->cmd = ((track[index + 1] & 0x80) >> 7) ? 0x91 : 0x81;
+  msg->db1 = track[index + 2];
+  msg->db2 = track[index + 3];
+  return index + 4;
 }
 
 void sdsource_playfile() {
+  lcd_printhome(""); // clear display
+  lcd_setcursor(0, 1);
+  for (int i = 0; i < volindex; i++) {
+    lcd_print((char) (1));
+  }
   unsigned long lt = millis();
   unsigned long kt = 0;
   unsigned long ct = 0;
@@ -215,7 +247,7 @@ void sdsource_playfile() {
       sd->p_msg->db2 = sd->next->db2;
       parsemsg(sd->p_msg);
       sd->buf_index = read_msg(sd->buf, sd->buf_index, sd->next);
-      //if (sd->read_count == 0) return;
+      if (sd->read_count == 0) return;
       lt = t;
     }
   }
