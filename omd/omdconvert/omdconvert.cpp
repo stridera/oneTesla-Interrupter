@@ -3,7 +3,9 @@
  * Copyleft 2015 oneTesla, LLC
  */
 
-#include "improv.h"
+#include "improv/include/MidiFile.h"
+
+using namespace std;
 
 #include <ctype.h>
 #include <string.h>
@@ -39,11 +41,12 @@ static pMidiEvent *p_events[MAX_EVENTS];
 
 int main(int argc, char* argv[]) {
 	if (argc <= 1) {
-	   cout << "Usage: omdconv.exe <file name> [arguments]" << endl;
+	   cout << "Usage: " << argv[0] << " <file name> [arguments]" << endl;
 	   cout << "Arguments:" << endl;
 	   cout << "-v: verbose mode" << endl;
 	   return 1;
    }
+   int i;
    FILE *out;
    FILE *in = fopen(argv[1], "r");
    int verbose = 0;
@@ -173,7 +176,7 @@ void setTempo(MidiFile& midifile, int index, double& tempo) {
    static int count = 0;
    count++;
 
-   _MFEvent& mididata = midifile.getEvent(0, index);
+   MFEvent& mididata = midifile.getEvent(0, index);
 
    int microseconds = 0;
    microseconds = microseconds | (mididata.data[3] << 16);

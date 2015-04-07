@@ -1,3 +1,6 @@
 [submodule "inc/SdFat"]
 	path = inc/SdFat
 	url = https://github.com/greiman/SdFat.git
+[submodule "omd/omdconvert/improv"]
+	path = omd/omdconvert/improv
+	url = http://github.com/craigsapp/improv.git
