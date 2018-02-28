@@ -39,7 +39,7 @@ static byte on_times[] =
 /****End instrument config variables****/
 
 /****System stuff****/
-#define FILE_BUFFER_SIZE 512
+#define FILE_BUFFER_SIZE 256
 
 #define MMC_CS 10
 
@@ -81,8 +81,8 @@ static unsigned char arrow[8] = {~0x0f, ~0x07, ~0x03, ~0x01, ~0x03, ~0x07, ~0x0f
 #define btnNONE   5
 
 #define MENU_SDCARD 0
-#define MENU_FIXED  1
-#define MENU_LIVE   2
+#define MENU_FIXED  2
+#define MENU_LIVE   1
 
 #define __CONSTANTS_H
 #endif

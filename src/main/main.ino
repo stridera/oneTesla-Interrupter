@@ -17,6 +17,7 @@
 
 #include <LiquidCrystal.h>
 #include <SdFat.h>
+#include <SPI.h>
 
 LiquidCrystal lcd(RS, EN, D4, D5, D6, D7);
 
@@ -24,7 +25,7 @@ note *note1, *note2;
 midiMsg *last_message;
 serialsource *serial;
 sdsource *sd;
-char volindex, menuindex = 0;
+char volindex, menuindex = 2;
 int ffreq = 20;
 
 void fixedLoop();
@@ -32,7 +33,6 @@ void displayMenu();
 
 void setup() {
   lcd_init();
-  lcd_printhome("Booting...");
   setupTimers();
   setupPins();
   player_init();
@@ -54,7 +54,7 @@ void loop() {
   }
   if (key == btnUP) {
     if (menuindex == 0) {
-      menuindex = 3;
+      menuindex = 2;
     } else {
       menuindex--;
     }
@@ -95,7 +95,17 @@ void displayMenu()
     lcd_setcursor(0, 1);
     if (sd->valid) {          
       lcd_print(sd->file_count);
-      lcd_print(" file(s).");
+      if (sd->file_count == 1) {
+        lcd_print(" file, ");
+      } else {
+        lcd_print(" files, ");
+      }
+      lcd_print(sd->dir_count);
+      if (sd->dir_count == 1) {
+        lcd_print(" dir");
+      } else {
+        lcd_print(" dirs");
+      }
     } else {
       lcd_print((char *)sd->last_error);
     }

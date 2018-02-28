@@ -10,7 +10,7 @@
 
 SdFat fs;
 SdFile file;
-char filename[256];
+char filename[100];
 
 void sdsource_init() {
   sd = (sdsource*) malloc(sizeof(sdsource));
@@ -20,6 +20,7 @@ void sdsource_init() {
   sd->last_error[0] = '\0';
   sd->valid = 0;
   sd->file_count = 0;
+  sd->dir_count = 0;
 
   sdsource_initcard();
 }
@@ -34,29 +35,31 @@ void sdsource_initcard() {
       return;
     }
     if (fs.vol()->fatType() == 0) {
-      strcpy(sd->last_error, "Inv Partition");
+      strcpy(sd->last_error, "Bad Partition");
       return;
     }
     if (fs.vwd()->isOpen()) {
-      strcpy(sd->last_error, "Inv Root");
+      strcpy(sd->last_error, "Bad Root");
       return;
     }
     strcpy(sd->last_error, "Unknown error");
     return;    
   }
 
-  lcd_printhome("Loading...");
-
-  while(sdsource_filenext(false)) {  
-    sd->file_count++;
+  for (;;) {
+    int flag = sdsource_filenext(true);
+    if (flag == 0) break;
+    if (flag == 1) sd->file_count++;
+    if (flag == 2) sd->dir_count++;
   }
   file.close();
   fs.vwd()->rewind();
+  strcpy(filename, "");
   
   if (sd->file_count == 0) {
     strcpy(sd->last_error, "No valid files");
   }
- 
+  
   sd->valid = 1;
 }
 
@@ -66,9 +69,10 @@ unsigned char sdsource_filenext(bool loadfile = false) {
   }
   while (file.openNext(fs.vwd(), O_READ)) {
     file.getName(filename, sizeof(filename));
-    if (check_and_get_filename()) {
-        if (loadfile) sdsource_loadfile();
-        return 1;
+    int flag = check_and_get_filename();
+    if (flag != 0) {
+        if (loadfile && !file.isDir()) sdsource_loadfile();
+        return flag;
     }
     file.close();
   }
@@ -76,30 +80,52 @@ unsigned char sdsource_filenext(bool loadfile = false) {
 }
 
 unsigned char sdsource_fileprev(bool loadfile = false) {
+  int currentIndex = file.dirIndex();
+  int lastIndex = -1;
+  int hasprev = 0;
+  if (file.isOpen()) file.close();
   fs.vwd()->rewind();
-  return sdsource_filenext(true);
-  // dir size is 32.
-  uint16_t index = fs.vwd()->curPosition()/32;
-  if (index < 2) return false;
-  // position to possible previous file location.
-  index -= 2;
-  do {
-    if (file.open(fs.vwd(), index, O_READ)) {
-      file.getName(filename, sizeof(filename));
-      lcd_printhome("Chk: ");
-      lcd_print(filename); delay(1000);
-      if (check_and_get_filename()) {
-        lcd_printhome("Failed"); delay(1000);
-        if (loadfile) sdsource_loadfile();
-        return 1;
+  strcpy(filename, "");
+  while (file.openNext(fs.vwd(), O_READ)) {
+    if (file.dirIndex() == currentIndex) {
+      if (lastIndex >= 0) {
+        file.close();
+        file.open(fs.vwd(), lastIndex, O_READ);
+        file.getName(filename, sizeof(filename));
+        if (check_and_get_filename() != 0) {
+          if (loadfile && !file.isDir()) sdsource_loadfile();
+        }
+        hasprev = 1;
+      } else {
+        hasprev = 0;
       }
-      file.close();
-    }    
-  } while (index-- > 0);
-  return 0;
+      break;
+    }
+    file.getName(filename, sizeof(filename));
+    if (check_and_get_filename() != 0) {
+      lastIndex = file.dirIndex();
+    }
+    file.close();
+  }
+  if (!hasprev) {
+    file.open(fs.vwd(), currentIndex, O_READ);
+    file.getName(filename, sizeof(filename));
+    check_and_get_filename();
+  }
+  return hasprev;
 }
 
 unsigned char check_and_get_filename() {
+  if (file.isHidden() || file.isSystem()) return 0;
+  if (file.isDir()) {
+    int i;
+    for (i = 0; i < sizeof(filename); i++) {
+      if (filename[i] == 0) break;
+    }
+    filename[i] = '/';
+    filename[i + 1] = 0;
+    return 2;
+  }
   char *dot = strrchr(filename, '.');
   if (strcasecmp(dot, ".omd") != 0) return 0;
   *dot = '\0'; // Cut off the extension for nicer display
@@ -109,26 +135,31 @@ unsigned char check_and_get_filename() {
 void sdsource_showfilename(int pos = 0) {
   int fn_len = strlen(filename) - 16;
   int start = 0;
-  if (fn_len < 0)
+  if (fn_len < 0){
     fn_len = 0;
-  else
-    start = (pos % (fn_len + 6)) - 3;  
+  } else {
+    start = (pos % (fn_len + 6)) - 3;
+  }
     
   // Pause for 3 beats at the beginning and end of the scroll
-  if (start < 0)
+  if (start < 0) {
     start = 0;
-  else if (start >= fn_len)
+  } else if (start >= fn_len) {
     start = fn_len;
+  }
   
   lcd_printhome(&filename[start]);
   lcd_setcursor(0, 1);
-  
-  unsigned int lsec = (int) (sd->len / 1000);
-  lcd_print(lsec / 60);
-  lcd_print(':');
-  unsigned int tmp = lsec % 60;
-  if (tmp < 10) lcd_print('0');
-  lcd_print(tmp);
+  if (!file.isDir()) {
+    unsigned int lsec = (int) (sd->len / 1000);
+    lcd_print(lsec / 60);
+    lcd_print(':');
+    unsigned int tmp = lsec % 60;
+    if (tmp < 10) lcd_print('0');
+    lcd_print(tmp);
+  } else {
+    lcd_print("Folder");
+  }
 }
 
 void sdsource_loadfile() {
@@ -158,26 +189,62 @@ void sdsource_run() {
     
     if (key == btnSELECT) {
       delay(150);
-      sdsource_playfile();
+      if (file.isDir()) {
+        if (fs.vwd()->isRoot()) {
+          fs.chdir(filename);
+          sdsource_filenext(true);
+          if (file.isOpen()) {
+            filepos = 0; kt = t;
+            sdsource_showfilename(filepos);
+          } else {
+            fs.vwd()->getName(filename, sizeof(filename));
+            int vwdindex = fs.vwd()->dirIndex();
+            fs.chdir("/");
+            file.close();
+            file.open(fs.vwd(), vwdindex, O_READ);
+            file.getName(filename, sizeof(filename));
+            check_and_get_filename();
+          }
+        } else {
+          lcd_clear();
+          lcd_printhome("Can't switch!");
+          delay(500);
+        }
+      } else {
+        sdsource_playfile();
+      }
       delay(300);
     }
     
     if (key == btnDOWN) {
       delay(150);
-      if (!sdsource_filenext(true)) {
+      if (sdsource_filenext(true) == 0) {
         file.close();
         fs.vwd()->rewind();
         sdsource_filenext(true);
       }
       filepos = 0; kt = t;
-      delay(300);
+      sdsource_showfilename(filepos);
     }
     
     if (key == btnUP) {
-      delay(150);
-      sdsource_fileprev(true);
+      int tt = millis();
+      int hasprev = sdsource_fileprev(true);
+      if (!hasprev && !fs.vwd()->isRoot()) {
+        fs.vwd()->getName(filename, sizeof(filename));
+        int vwdindex = fs.vwd()->dirIndex();
+        fs.chdir("/");
+        file.close();
+        file.open(fs.vwd(), vwdindex, O_READ);
+        file.getName(filename, sizeof(filename));
+        check_and_get_filename();
+      }
+      int dt = millis() - tt;
+      int dd = 150 - dt;
+      if (dd < 0) dd = 0;
+      delay(dd);
       filepos = 0; kt = t;
-      delay(300);
+      sdsource_showfilename(filepos);
     }
   }
 }
@@ -196,10 +263,9 @@ unsigned int read_msg(unsigned char *track, unsigned int index, timedMidiMsg* ms
 }
 
 void sdsource_playfile() {
-  lcd_printhome(""); // clear display
-  lcd_setcursor(0, 1);
+  lcd_printhome("\2 ");
   for (int i = 0; i < volindex; i++) {
-    lcd_print((char) (1));
+    lcd_printat(i, 1, (char) (1));
   }
   unsigned long lt = millis();
   unsigned long kt = 0;
@@ -211,6 +277,8 @@ void sdsource_playfile() {
     if (t - kt > 100) {
       if (key == btnSELECT) {
         note_stop();
+        file.rewind();
+        sd->buf_index = sd->read_count = 0;
         kt = t;
         return;
       } 
@@ -247,7 +315,11 @@ void sdsource_playfile() {
       sd->p_msg->db2 = sd->next->db2;
       parsemsg(sd->p_msg);
       sd->buf_index = read_msg(sd->buf, sd->buf_index, sd->next);
-      if (sd->read_count == 0) return;
+      if (sd->read_count == 0) {
+        note_stop();
+        file.rewind();
+        return;
+      }
       lt = t;
     }
   }

@@ -38,7 +38,7 @@ typedef struct {
 
   char last_error[17];  
   unsigned char valid;
-  unsigned int file_count;
+  unsigned int file_count, dir_count;
   unsigned char *buf;
   unsigned char *msgbuf;
   unsigned int buf_index;

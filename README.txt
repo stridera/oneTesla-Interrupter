@@ -9,9 +9,14 @@ The SD card interrupter is designed to be a full-featured interrupter with suppo
 *Fixed mode with precise timer-based frequency control down to 1Hz.
 *Small firmware size using fixed-point math, no softfloat libraries or FPU needed.
 
+
 ==Building==
 
 This firmware has been developed on Arduino 1.0.3. We do not recommend using other versions due to Arduino's occasional tendency to break backwards compatibility. You will need to copy the libraries in inc/ to arduino-1.0.3/libraries. After that, it should be as simple as opening src/main/main.ino and clicking "Verify/Compile" in the Arduino IDE.
+
+==Compatibility==
+
+The interrupter is compatible with MicroSD/SDHC cards formatted with a FAT16 or FAT32 filesystem. Long filenames up to 99 characters are supported, as well as support for one level of directory.
 
 ==File description==
 
@@ -31,6 +36,7 @@ src/main
 inc/
     |------ LiquidCrystal: Hitachi LCD driver library
     |------ PFFS: Petit FatFS filesystem driver
+    |------ SdFat: Full featured FAT32 library
 
 
 bin/
@@ -38,13 +44,18 @@ bin/
 
 omd/
     |------ omdconvert/
+    |            |------ improv/: Improv MIDI library
     |            |------ omdconvert.exe: MIDI to OMD converter
+    |            |------ omdconvert: Mac version of the converter
     |            |------ omdconvert.cpp: Source for the converter
     |            |------ README.txt: README for the converter
     |
     |------ *.mid, *.OMD: sample files
 
 README.txt: this file :)
+
+==CREDITS==
+Props to the writers of Improv, PFFS, and SdFAT for making this possible. Special mention to Stridera on our forums, who implemented SDHC support and a bunch of neat fixes.
 
 ==LICENSING==
 
